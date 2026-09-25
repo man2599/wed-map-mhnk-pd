@@ -1,0 +1,269 @@
+/* ========================================
+   MHNK Map - PIN Auth styles
+   เข้าชุดกับธีมใน map-module/src/map-style.css (ใช้ตัวแปรสีชุดเดียวกัน)
+   ======================================== */
+
+/* ── ปุ่มในแถบ sidebar (ตำแหน่งเดิมของปุ่มเชื่อม DC) ── */
+.mhnk-pin-connect {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mhnk-pin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(61, 123, 255, 0.22));
+  border: 1px solid var(--line-2, rgba(0, 229, 255, 0.4));
+  border-radius: 8px;
+  color: var(--text, #eaf4ff);
+  font-family: var(--font-ui, 'Prompt', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 229, 255, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.mhnk-pin-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transition: left 0.5s ease;
+}
+
+.mhnk-pin-btn:hover::before { left: 100%; }
+
+.mhnk-pin-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(61, 123, 255, 0.34));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.28);
+}
+
+/* ── สถานะปลดล็อกแล้ว ── */
+.mhnk-pin-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(42, 255, 155, 0.1), rgba(42, 255, 155, 0.04));
+  border: 1px solid rgba(42, 255, 155, 0.3);
+  border-radius: 8px;
+  animation: pinFadeIn 0.3s ease;
+}
+
+@keyframes pinFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mhnk-pin-badge {
+  width: 32px; height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid rgba(42, 255, 155, 0.5);
+  color: var(--green, #2aff9b);
+  flex-shrink: 0;
+}
+
+.mhnk-pin-details { flex: 1; min-width: 0; }
+
+.mhnk-pin-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mhnk-pin-sub {
+  font-family: var(--font-tec, 'Orbitron', monospace);
+  font-size: 9px;
+  color: var(--muted, #7d8fb3);
+  letter-spacing: 0.5px;
+}
+
+.mhnk-pin-lock {
+  width: 28px; height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 45, 85, 0.15);
+  border: 1px solid rgba(255, 45, 85, 0.3);
+  border-radius: 50%;
+  color: var(--red, #ff2d55);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.mhnk-pin-lock:hover {
+  background: rgba(255, 45, 85, 0.3);
+  transform: scale(1.1);
+}
+
+/* ── กล่องกรอกรหัส ── */
+.mhnk-pin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 4, 10, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.mhnk-pin-overlay.show { display: flex; }
+
+.mhnk-pin-modal {
+  width: 100%;
+  max-width: 340px;
+  background: var(--panel-solid, #0a1222);
+  border: 1px solid var(--line-2, rgba(0, 229, 255, 0.4));
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 229, 255, 0.08);
+  overflow: hidden;
+  animation: pinPop 0.18s ease;
+}
+
+@keyframes pinPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mhnk-pin-modal.shake { animation: pinShake 0.35s ease; }
+
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-5px); }
+  80%      { transform: translateX(5px); }
+}
+
+.mhnk-pin-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line, rgba(0, 229, 255, 0.14));
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.08), transparent);
+}
+
+.mhnk-pin-modal-ico { font-size: 16px; }
+
+.mhnk-pin-modal-head h3 {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-tec, 'Orbitron', monospace);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--cyan, #00e5ff);
+}
+
+.mhnk-pin-modal-head h3 span {
+  font-family: var(--font-ui, 'Prompt', sans-serif);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted, #7d8fb3);
+}
+
+.mhnk-pin-close {
+  background: none;
+  border: none;
+  color: var(--muted, #7d8fb3);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.mhnk-pin-close:hover { color: var(--red, #ff2d55); }
+
+.mhnk-pin-modal-body { padding: 22px 16px 8px; }
+
+.mhnk-pin-code {
+  display: block;
+  width: 100%;
+  height: 68px;
+  box-sizing: border-box;
+  text-align: center;
+  text-indent: 16px;              /* ชดเชย letter-spacing ให้อยู่กึ่งกลางจริง */
+  letter-spacing: 16px;
+  font-family: var(--font-tec, "Orbitron", monospace);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--cyan, #00e5ff);
+  background: rgba(0, 229, 255, 0.05);
+  border: 1px solid var(--line, rgba(0, 229, 255, 0.14));
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.mhnk-pin-code::placeholder {
+  color: rgba(125, 143, 179, 0.5);
+}
+
+.mhnk-pin-code:focus {
+  border-color: var(--cyan, #00e5ff);
+  background: rgba(0, 229, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.15);
+}
+
+.mhnk-pin-msg {
+  min-height: 20px;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--red, #ff2d55);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mhnk-pin-msg.show { opacity: 1; }
+
+.mhnk-pin-modal-foot {
+  padding: 8px 16px 16px;
+}
+
+.mhnk-pin-cta {
+  width: 100%;
+  padding: 11px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.22), rgba(61, 123, 255, 0.26));
+  border: 1px solid var(--line-2, rgba(0, 229, 255, 0.4));
+  border-radius: 8px;
+  color: var(--text, #eaf4ff);
+  font-family: var(--font-ui, 'Prompt', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mhnk-pin-cta:hover {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.34), rgba(61, 123, 255, 0.4));
+  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.25);
+}
+
+@media (max-width: 420px) {
+  .mhnk-pin-code { height: 58px; font-size: 24px; letter-spacing: 12px; text-indent: 12px; }
+}

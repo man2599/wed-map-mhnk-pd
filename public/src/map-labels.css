@@ -1,0 +1,43 @@
+/* ========================================
+   MHNK Map - Always-On Labels (สไตล์ปุ่ม + ป้ายชื่อถาวร)
+   คู่กับ public/src/map-labels.js
+   ======================================== */
+
+/* ── ปุ่มสลับ ใต้ ATLAS / SATELITE ── */
+.mhnk-label-toggle {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mhnk-label-toggle .mhnk-style-btn {
+  width: 100%;
+  text-align: center;
+}
+
+/* ── ป้ายชื่อแบบค้างไว้ ──
+   ต่อยอดจาก .mhnk-poi-tooltip (map-module/src/map-style.css)
+   ย่อลงหน่อยเพราะขึ้นพร้อมกันทีละ 400+ ป้าย */
+.mhnk-poi-label {
+  /* สำคัญ: ห้ามบังการคลิกแผนที่ — เว็บนี้ใช้คลิกบนแผนที่เพื่อปักหมุด */
+  pointer-events: none !important;
+  font-size: 10px !important;
+  padding: 3px 8px !important;
+  opacity: 0.94;
+  white-space: nowrap;
+}
+
+/* ป้ายถาวรไม่ต้องมีหางลูกศร จะได้ไม่รกตอนหมุดอยู่ชิดกัน */
+.mhnk-poi-label::before {
+  display: none !important;
+}
+
+/* ── ป้ายที่กำลังถูกชี้ → ดันขึ้นบนสุด อ่านได้ชัดแม้ทับกัน ── */
+.mhnk-poi-label-top {
+  z-index: 10000 !important;
+  opacity: 1 !important;
+  background: rgba(4, 9, 19, 0.99) !important;
+  border-color: rgba(0, 229, 255, 0.95) !important;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.55) !important;
+  /* หมายเหตุ: ห้ามใส่ transform ที่นี่ — Leaflet ใช้ inline transform จัดตำแหน่ง tooltip */
+}

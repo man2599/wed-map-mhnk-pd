@@ -1,0 +1,48 @@
+/* ========================================
+   MHNK Map - ปุ่มสวิตช์ซ่อนจุดทั้งแผนที่
+
+   ขนาดเท่ากล่องโลโก้เดิม (.mhnk-sidebar-badge = 42x42) เพราะมันสลับที่กัน
+   ใช้ตัวแปรสีชุดเดียวกับ map-style.css
+   ======================================== */
+
+.mhnk-vis-btn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(61, 123, 255, 0.22));
+  border: 1px solid var(--line-2, rgba(0, 229, 255, 0.4));
+  border-radius: 8px;
+  color: var(--acc, #00e5ff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 229, 255, 0.12);
+}
+
+.mhnk-vis-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(61, 123, 255, 0.34));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.28);
+}
+
+/* ── ซ่อนจุดอยู่ = แดง ให้เห็นชัดว่าโหมดสอบเปิดค้างไว้ ── */
+.mhnk-vis-btn.is-hidden {
+  background: linear-gradient(135deg, rgba(255, 45, 85, 0.22), rgba(255, 45, 85, 0.1));
+  border-color: rgba(255, 45, 85, 0.55);
+  color: #ff2d55;
+  box-shadow: 0 4px 15px rgba(255, 45, 85, 0.18);
+}
+
+.mhnk-vis-btn.is-hidden:hover {
+  background: linear-gradient(135deg, rgba(255, 45, 85, 0.34), rgba(255, 45, 85, 0.18));
+  box-shadow: 0 6px 20px rgba(255, 45, 85, 0.32);
+}
+
+.mhnk-vis-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+  transform: none;
+}

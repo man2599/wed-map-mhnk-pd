@@ -1,0 +1,22 @@
+# Dependency
+node_modules/
+
+# Environment variables (มี service account อยู่ข้างใน — ห้าม commit เด็ดขาด)
+.env
+
+# Google Cloud Credentials (เว็บนี้ไม่ใช้ไฟล์นี้แล้ว แต่กันเหนียวไว้)
+credentials.json
+
+# Logs
+*.log
+*.pid
+
+# ไฟล์สำรองชีต (สร้างใหม่อัตโนมัติตอน server start)
+data/poi-backup-*.json
+
+# Vercel build output (สร้างใหม่ทุกครั้งด้วย scripts/build-vercel.js)
+dist/
+.vercel/
+
+.vercel
+.env*

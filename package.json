@@ -1,0 +1,43 @@
+{
+  "name": "mhnk-map",
+  "version": "1.0.0",
+  "description": "MHNK PD // GEO-INTEL MAP - standalone map site (map-module extracted)",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "build": "node scripts/build-vercel.js"
+  },
+  "keywords": [
+    "fivem",
+    "gtav",
+    "map",
+    "leaflet",
+    "mhnk"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@googleapis/sheets": "^18.0.1",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2",
+    "google-auth-library": "^11.1.0",
+    "helmet": "^8.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "data/*",
+      "dist/*",
+      "public/**/*",
+      "map-module/**/*"
+    ]
+  }
+}

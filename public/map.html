@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MHNK PD // GEO-INTEL MAP</title>
+
+  <!-- Fonts: Orbitron (tech) + Prompt (Thai) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+  <!-- Map Module Styles -->
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/map-module/src/map-style.css?v=8" />
+  <link rel="stylesheet" href="/map-module/overlay/src/overlay-style.css?v=2" />
+  <link rel="stylesheet" href="/src/map-pin.css?v=2" />
+  <link rel="stylesheet" href="/src/map-labels.css?v=2" />
+  <link rel="stylesheet" href="/src/map-visibility.css?v=1" />
+  <!-- Leaflet.draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+</head>
+<body>
+  <!-- ═══════════ BOOT SCREEN ═══════════ -->
+  <div class="mhnk-boot" id="mhnk-boot">
+    <div class="mhnk-boot-grid"></div>
+    <div class="mhnk-boot-inner">
+      <div class="mhnk-boot-badge"><img class="mhnk-boot-logo" src="/logo.webp" alt="MHNK"></div>
+      <h1 class="mhnk-boot-title">MHNK<span>·PD</span></h1>
+      <div class="mhnk-boot-sub">GEO-INTELLIGENCE TERMINAL v0.1</div>
+      <div class="mhnk-boot-bar"><div class="mhnk-boot-fill" id="mhnk-boot-fill"></div></div>
+      <div class="mhnk-boot-status" id="mhnk-boot-status">INITIALIZING SECURE CHANNEL…</div>
+    </div>
+  </div>
+
+  <div class="mhnk-map-page">
+    <!-- ═══════════ HUD TOP BAR ═══════════ -->
+    <header class="mhnk-hud-top">
+      <div class="mhnk-hud-brand">
+        <span class="mhnk-hud-logo"><img class="hud-logo-img" src="/logo.webp" alt="MHNK"></span>
+        <div class="mhnk-hud-brand-text">
+          <div class="mhnk-hud-title">MHNK<span>·PD</span></div>
+          <div class="mhnk-hud-sub">GEO-INTEL // MAP TERMINAL</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══════════ MAP AREA ═══════════ -->
+    <main class="mhnk-map-main">
+      <div id="mhnk-map-container"></div>
+
+      <!-- Atmosphere overlays -->
+      <div class="mhnk-vignette"></div>
+      <div class="mhnk-scanlines"></div>
+
+      <!-- Radar sweep -->
+      <div class="mhnk-radar" aria-hidden="true">
+        <div class="mhnk-radar-ring r0"></div>
+        <div class="mhnk-radar-ring r1"></div>
+        <div class="mhnk-radar-ring r2"></div>
+        <div class="mhnk-radar-sweep"></div>
+        <div class="mhnk-radar-blip b1"></div>
+        <div class="mhnk-radar-blip b2"></div>
+      </div>
+
+      <!-- Style Controls -->
+      <div class="mhnk-map-controls">
+        <div class="mhnk-style-panel">
+          <div class="mhnk-panel-tag">◢ MAP LAYER</div>
+          <div class="mhnk-style-btns">
+            <button class="mhnk-style-btn active" data-style="atlas" onclick="MHNK_MAP.switchStyle('atlas')">🗺 ATLAS</button>
+            <button class="mhnk-style-btn" data-style="satelite" onclick="MHNK_MAP.switchStyle('satelite')">🛰 SATELITE</button>
+          </div>
+          <div class="mhnk-label-toggle">
+            <button type="button" class="mhnk-style-btn" id="mhnk-label-btn" onclick="MHNK_LABELS.toggle()" aria-pressed="false">◎ ชื่อหมุด : ปิด</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crosshair (เป้ากลางจอ) -->
+      <div class="mhnk-crosshair">
+        <div class="mhnk-crosshair-circle"></div>
+        <div class="mhnk-crosshair-h"></div>
+        <div class="mhnk-crosshair-v"></div>
+      </div>
+
+      <!-- Hint bar -->
+      <div class="mhnk-hint">▸ คลิกบนแผนที่เพื่อลงจุดแจ้ง <span class="mhnk-hint-eng">// CLICK MAP TO DROP PIN</span></div>
+    </main>
+
+    <!-- ═══════════ SIDEBAR ═══════════ -->
+    <aside class="mhnk-map-sidebar">
+      <div class="mhnk-sidebar-header">
+        <div class="mhnk-sidebar-title-row">
+          <!-- ล็อกอยู่ = โลโก้ / ใส่รหัสแล้ว = ปุ่มซ่อนจุด (MHNK_VIS สลับให้) -->
+          <div class="mhnk-sidebar-badge" id="mhnk-sidebar-badge"><img class="sidebar-logo-img" src="/logo.webp" alt="MHNK"></div>
+          <button type="button" class="mhnk-vis-btn" id="mhnk-vis-btn" style="display:none" aria-pressed="false"></button>
+          <div class="mhnk-pin-connect" id="mhnk-pin-connect">
+            <button type="button" class="mhnk-pin-btn" id="mhnk-pin-btn">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="flex-shrink:0">
+                <path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3v3H9V6a3 3 0 0 1 3-3Zm0 10.5a2 2 0 0 1 1 3.73V18.5a1 1 0 0 1-2 0v-1.27a2 2 0 0 1 1-3.73Z"/>
+              </svg>
+              <span>ใส่รหัสเพื่อแก้ไข</span>
+            </button>
+            <div class="mhnk-pin-info" id="mhnk-pin-info" style="display:none;">
+              <div class="mhnk-pin-badge">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                  <path d="M12 1a5 5 0 0 0-5 5 1 1 0 0 0 2 0 3 3 0 0 1 6 0v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm0 12.5a2 2 0 0 1 1 3.73V18.5a1 1 0 0 1-2 0v-1.27a2 2 0 0 1 1-3.73Z"/>
+                </svg>
+              </div>
+              <div class="mhnk-pin-details">
+                <div class="mhnk-pin-name">ปลดล็อกแล้ว</div>
+                <div class="mhnk-pin-sub">แก้ไขแผนที่ได้</div>
+              </div>
+              <button type="button" class="mhnk-pin-lock" id="mhnk-pin-lock" title="ล็อกกลับ">✕</button>
+            </div>
+          </div>
+        </div>
+        <div class="mhnk-sidebar-scanline"></div>
+      </div>
+
+      <div class="mhnk-sidebar-controls">
+        <div class="mhnk-search-box">
+          <span class="mhnk-search-icon">⌕</span>
+          <input type="text" id="mhnk-poi-search" placeholder="SEARCH เป้า… เจาะระบบฐานข้อมูล" autocomplete="off" />
+        </div>
+        <div class="mhnk-filter-wrap">
+          <select id="mhnk-poi-filter" class="mhnk-filter-select"></select>
+        </div>
+        <button class="mhnk-export-btn" onclick="window.location.href='/Challenge'" title="ทายตำแหน่งจากชื่อสถานที่ 50 จุด">
+          <span class="mhnk-export-ico">🎮</span>
+          <span class="mhnk-export-lbl">PLAY LOCATE MAP</span>
+          <span class="mhnk-export-hint">50 TARGETS</span>
+        </button>
+      </div>
+
+      <div class="mhnk-poi-stats" id="mhnk-poi-stats">
+        <span class="mhnk-stat-num">0</span>
+        <span class="mhnk-stat-unit">BEACONS</span>
+        <span class="mhnk-stat-sig">●&nbsp;REC&nbsp;✓</span>
+      </div>
+
+      <div class="mhnk-poi-list" id="mhnk-poi-list">
+        <div class="mhnk-empty">⏳ กำลังโหลด...</div>
+      </div>
+    </aside>
+  </div>
+<!-- ═══════════ MODAL ═══════════ -->
+  <div class="mhnk-modal-overlay" id="mhnk-modal-overlay">
+    <div id="mhnk-modal-body"></div>
+  </div>
+
+  <!-- Overlay Controls -->
+  <div class="mhnk-overlay-panel" id="overlay-panel">
+    <div class="mhnk-overlay-title" onclick="MHNK_OVERLAY.togglePanel()">◢ ZONES</div>
+    <div class="mhnk-overlay-content" id="overlay-content">
+      <div class="mhnk-overlay-colors">
+        <div class="mhnk-overlay-color-btn active" data-color="#ff2d55" style="--oc:#ff2d55" onclick="MHNK_OVERLAY.setColor('#ff2d55')"></div>
+        <div class="mhnk-overlay-color-btn" data-color="#2aff9b" style="--oc:#2aff9b" onclick="MHNK_OVERLAY.setColor('#2aff9b')"></div>
+        <div class="mhnk-overlay-color-btn" data-color="#00e5ff" style="--oc:#00e5ff" onclick="MHNK_OVERLAY.setColor('#00e5ff')"></div>
+      </div>
+      <div class="mhnk-overlay-tools">
+        <div class="mhnk-overlay-tool" onclick="MHNK_OVERLAY.startDraw('polygon')" title="วาด">✏</div>
+        <div class="mhnk-overlay-tool" onclick="MHNK_OVERLAY.startEdit()" title="แก้ไข">✎</div>
+        <div class="mhnk-overlay-tool" onclick="MHNK_OVERLAY.startDelete()" title="ลบ">✕</div>
+        <div class="mhnk-overlay-tool" onclick="MHNK_OVERLAY.finishDraw()" title="เสร็จสิ้น">✓</div>
+      </div>
+      <div class="mhnk-overlay-btns">
+        <div class="mhnk-overlay-btn" id="overlay-btn-all" onclick="MHNK_OVERLAY.toggleAll()" style="--oc:#00e5ff">
+          <div class="mhnk-overlay-dot"></div>
+          <div class="mhnk-overlay-label">เปิด/ปิด ทั้งหมด</div>
+        </div>
+      </div>
+      <div class="mhnk-overlay-clear" onclick="MHNK_OVERLAY.clearDrawn()">CLEAR DRAWN</div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <!-- Leaflet.draw JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+  <!-- Map Module Scripts -->
+  <script src="/map-module/src/map-categories.js?v=9"></script>
+  <script src="/map-module/src/map-core.js?v=9"></script>
+  <script src="/map-module/src/map-poi.js?v=9"></script>
+  <!-- PIN auth — ประกาศ global ชื่อ MHNK_DC เพื่อให้ map-poi.js เรียกได้โดยไม่ต้องแก้ -->
+  <script src="/src/map-pin.js?v=2"></script>
+  <!-- ป้ายชื่อหมุดค้างไว้ — ครอบ MHNK_MAP จากข้างนอก ไม่แตะ map-module -->
+  <script src="/src/map-labels.js?v=2"></script>
+  <!-- สวิตช์ซ่อนจุดทั้งแผนที่ (โหมดสอบ) — ซ่อนจริงที่ server ตัวนี้แค่ปุ่ม -->
+  <script src="/src/map-visibility.js?v=1"></script>
+
+  <!-- Overlay Module -->
+  <script src="/map-module/overlay/src/overlay-data.js?v=1"></script>
+  <script src="/map-module/overlay/src/overlay-core.js?v=1"></script>
+
+  <script>
+    // ══════════ BOOT SCREEN ANIMATION ══════════
+    (function bootStart() {
+      var steps = [
+        'DECRYPTING ENCRYPTED TILES…',
+        'LINKING SATELLITE UPLINK…',
+        'SYNCING TACTICAL DATABASE…',
+        'CALIBRATING HUD INTERFACE…',
+        'ACCESS GRANTED · WELCOME OFFICER'
+      ];
+      var i = 0;
+      var fill = document.getElementById('mhnk-boot-fill');
+      var status = document.getElementById('mhnk-boot-status');
+      if (!fill || !status) return;
+
+      function tick() {
+        i++;
+        var pct = Math.min(i / 16, 1);
+        fill.style.width = (pct * 100) + '%';
+        if (i % 3 === 0) status.textContent = steps[Math.min(Math.floor(i / 4), steps.length - 1)];
+        if (pct < 1) {
+          setTimeout(tick, 70);
+        } else {
+          setTimeout(function () {
+            var boot = document.getElementById('mhnk-boot');
+            if (boot) boot.classList.add('done');
+          }, 220);
+        }
+      }
+      setTimeout(tick, 150);
+    })();
+
+    // ══════════ INIT MAP + POI ══════════
+    document.addEventListener('DOMContentLoaded', function () {
+      try {
+        // tile ของเว็บนี้แปลงเป็น WebP หมดแล้ว (เล็กกว่า JPEG 71-89%)
+        // ส่งเป็น options แทนการไปแก้ styleExts ใน map-module/src/map-core.js
+        // — map-module ก๊อปมาจากเว็บหลัก ถ้าแก้ในนั้นแล้ววันหลังก๊อปมาทับ แผนที่จะขอ .jpg ที่ไม่มีแล้ว
+        MHNK_MAP.init('mhnk-map-container', {
+          styleExts: { atlas: 'webp', satelite: 'webp' }
+        });
+
+        // ป้ายชื่อหมุด — ต้องเรียกก่อน MHNK_POI.init() เพื่อครอบ addPoi ให้ทัน
+        MHNK_LABELS.init();
+
+        // ปุ่มซ่อนจุดทั้งแผนที่ — โผล่แทนโลโก้เมื่อใส่รหัสแล้ว (MHNK_DC เรียก setUnlocked ให้)
+        MHNK_VIS.init();
+
+        // Init Overlay
+        MHNK_OVERLAY.init(MHNK_MAP.map, OVERLAY_ZONES);
+      } catch (e) {
+        console.error('[MHNK] Map init error:', e);
+      }
+
+      var startPoi = function () {
+        try {
+          MHNK_POI.init();
+        } catch (e) {
+          console.error('[MHNK] POI init error:', e);
+          setTimeout(function () {
+            try { MHNK_POI.init(); } catch (e2) { console.error('[MHNK] POI retry error:', e2); }
+          }, 1000);
+        }
+      };
+
+      // Initialize PIN Auth
+      if (typeof MHNK_DC !== 'undefined') {
+        MHNK_DC.init(function(isConnected, dcId, dcName) {
+          // ล็อก/ปลดล็อก → สลับโลโก้กับปุ่มซ่อนจุด
+          MHNK_VIS.setUnlocked(isConnected);
+          // Re-load POIs to update authorized IDs and re-render
+          if (typeof MHNK_POI !== 'undefined' && MHNK_POI.pois) {
+            MHNK_POI.loadPois();
+          }
+        });
+      }
+
+      document.addEventListener('mhnk-map-ready', startPoi);
+      setTimeout(startPoi, 500);
+    });
+  </script>
+</body>
+</html>
