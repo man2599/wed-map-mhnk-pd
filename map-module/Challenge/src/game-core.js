@@ -51,7 +51,7 @@ const GAME = {
 
   async _loadPois() {
     try {
-      const res = await fetch('/api/poi'); const data = await res.json();
+      const res = await fetch('/api/poi/game'); const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         this.allPois = data.data.filter(p => p.x && p.y && p.name);
         this.roundPois = this._shuffle(this.allPois).slice(0, this.totalRounds);

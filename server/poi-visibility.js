@@ -98,10 +98,23 @@ async function writeHidden(sheets, hidden) {
  * router ที่ต้อง mount ก่อน poi-routes:
  *   GET  /api/poi/visibility  อ่านสถานะ (ใครก็อ่านได้ — หน้าเว็บต้องใช้ตอนวาดปุ่ม)
  *   POST /api/poi/visibility  สลับสถานะ (pinAuth.requirePin กัน POST ไว้ให้แล้ว)
+ *   GET  /api/poi/game        ทางลัดให้เกม — ได้ข้อมูลเสมอ ไม่สนสวิตช์
  *   GET  /api/poi             ถ้าปิดอยู่และผู้เรียกไม่ได้ใส่รหัส → คืน [] แล้วจบตรงนี้
  */
 function createVisibilityRoutes(getSheetsFn) {
     const router = Router();
+
+    /* เกม /Challenge ใช้ทางนี้แทน /api/poi เพื่อให้เล่นได้ตลอดแม้สวิตช์ปิดอยู่
+       รูปแบบการสอบคือขับรถพาดูใน map แล้วให้ผู้สอบทายว่าเป็นที่ไหน
+       เกมสุ่มจุดมาทีละอัน กดหาให้ตรงกับที่เห็นตรงหน้าภายในไม่กี่วินาทีไม่ทัน
+       จึงไม่นับเป็นทางลัดของการสอบแบบนี้
+
+       ⚠️ แลกมาด้วย: ใครเปิด URL นี้ตรง ๆ ก็ได้ข้อมูลครบเหมือน /api/poi ตอนสวิตช์เปิด
+       เป็นการยอมแลกที่ตั้งใจ ไม่ใช่มองข้าม */
+    router.get('/game', (req, res, next) => {
+        req.url = '/';      // ให้ poi-routes มองเป็น GET /api/poi ปกติ
+        next('router');     // ออกจาก router นี้เลย ไม่ผ่านด่านเช็คสวิตช์ข้างล่าง
+    });
 
     router.get('/visibility', async (req, res) => {
         if (!sheetId()) return res.json({ success: true, hidden: false });

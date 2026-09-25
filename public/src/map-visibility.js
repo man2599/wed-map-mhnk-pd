@@ -5,17 +5,35 @@
    ล็อกอยู่ = เห็นโลโก้ / ใส่รหัสแล้ว = โลโก้กลายเป็นปุ่มนี้
 
    การซ่อนจริงทำที่ server (server/poi-visibility.js) — /api/poi คืน []
-   ฝั่งนี้แค่แสดงสถานะกับสั่งสลับ ไม่ได้ซ่อนอะไรเอง
    คนที่ใส่รหัสแล้วยังเห็นจุดครบตามเดิม จะได้คุมสอบไปแก้แผนที่ไปได้
 
-   ⚠️ จงใจไม่ยุ่งกับ marker บนแผนที่เลย — ไม่ clearPois ไม่ addPoi ไม่แตะ tooltip
-      เพราะ MHNK_LABELS ครอบ MHNK_MAP.addPoi กับ event mouseover/mouseout ไว้
-      ถ้ามาสั่งวาดหมุดใหม่ตรงนี้ด้วย ป้ายชื่อหมุดจะเพี้ยนแบบที่เคยเจอ
+   ── คนที่เปิดหน้าค้างไว้ก่อนแอดมินกดปิด ──
+   ข้อมูลอยู่ในหน่วยความจำเบราว์เซอร์แล้ว แพน/ซูม/สลับ style ก็ไม่โหลดใหม่
+   ถ้าไม่ทำอะไรเลยเขาจะเห็นแผนที่ครบทั้งคาบสอบ
+   ตัวเฝ้า (_watch) เลยถาม /api/poi/visibility ทุก 60 วิ — endpoint นี้หนักแค่ ~30 bytes
+   ไม่ใช่ /api/poi ที่หนัก 83 KB
+
+   ถามเพิ่มตอนสลับกลับมาที่แท็บด้วย (เห็นผลทันทีไม่ต้องรอครบ 60 วิ)
+   แต่พึ่ง event นี้อย่างเดียวไม่ได้ เพราะคนเปิด 2-3 จอ หรือวางมือถือไว้ข้าง ๆ
+   แท็บจะ "มองเห็น" ตลอด event ไม่ยิงสักครั้ง — timer จึงเป็นตาข่ายหลัก
+
+   ถามไม่สำเร็จ (เน็ตหลุด) = ถือว่าปิดไว้ก่อน และซ่อนแบบไม่ง้อเน็ต
+
+   ⚠️ ตอนซ่อน/แสดงใช้ทางเดียวกับที่โมดูลใช้เองเสมอ (clearPois / loadPois)
+      ห้ามไปยุ่ง marker รายตัวหรือ tooltip เอง เพราะ MHNK_LABELS ครอบ
+      MHNK_MAP.addPoi กับ event mouseover/mouseout ไว้ — แตะเองแล้วป้ายชื่อหมุดเพี้ยน
    ======================================== */
 
 const MHNK_VIS = {
   hidden: false,
   _busy: false,
+
+  POLL_MS: 60000,     // ตาข่ายหลัก
+  EVENT_GAP_MS: 5000, // กันถามรัวตอนสลับแท็บไปมาเร็ว ๆ
+  _timer: null,
+  _lastCheck: 0,
+  _restoring: false,  // กันสั่ง loadPois ซ้อนกันตอนกำลังดึงข้อมูลกลับ
+  _onWake: null,
 
   ICON_ON: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">'
     + '<path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/>'
@@ -39,8 +57,14 @@ const MHNK_VIS = {
     var btn = this._btn();
     if (logo) logo.style.display = unlocked ? 'none' : 'flex';
     if (btn) btn.style.display = unlocked ? 'flex' : 'none';
-    // คนที่ยังไม่ใส่รหัสไม่เห็นปุ่ม เลยไม่ต้องยิงถามสถานะให้เปลือง
-    if (unlocked) this._load();
+
+    if (unlocked) {
+      // แอดมินเห็นจุดครบเสมอไม่ว่าสวิตช์จะปิดอยู่หรือเปล่า ไม่ต้องเฝ้า
+      this._stopWatch();
+      this._load();
+    } else {
+      this._startWatch();
+    }
   },
 
   async toggle() {
@@ -61,6 +85,77 @@ const MHNK_VIS = {
     } finally {
       this._busy = false;
       this._render();
+    }
+  },
+
+  // ───────── ตัวเฝ้า (เฉพาะคนที่ยังไม่ใส่รหัส) ─────────
+
+  _startWatch() {
+    if (this._timer) return;
+    var self = this;
+
+    this._onWake = function () {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - self._lastCheck < self.EVENT_GAP_MS) return;
+      self._check();
+    };
+    document.addEventListener('visibilitychange', this._onWake);
+    window.addEventListener('focus', this._onWake);
+
+    this._timer = setInterval(function () { self._check(); }, this.POLL_MS);
+  },
+
+  _stopWatch() {
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    if (this._onWake) {
+      document.removeEventListener('visibilitychange', this._onWake);
+      window.removeEventListener('focus', this._onWake);
+      this._onWake = null;
+    }
+  },
+
+  async _check() {
+    this._lastCheck = Date.now();
+    var hidden;
+    try {
+      var res = await fetch('/api/poi/visibility', { cache: 'no-store', credentials: 'same-origin' });
+      var data = await res.json();
+      hidden = !!(data && data.hidden);
+    } catch (e) {
+      hidden = true;   // ถามไม่ได้ = ปิดไว้ก่อน
+    }
+    this._applyToPage(hidden);
+  },
+
+  _hasPois() {
+    return !!(typeof MHNK_POI !== 'undefined' && MHNK_POI.pois && MHNK_POI.pois.length);
+  },
+
+  /** ปรับหน้าเว็บให้ตรงกับสวิตช์
+   *
+   *  เทียบกับ "สิ่งที่หน้าเว็บมีอยู่จริง" ไม่ใช่สถานะที่จำไว้
+   *  เพราะตอน setUnlocked ถูกเรียกครั้งแรก loadPois ยังโหลดไม่เสร็จ
+   *  ถ้าไปจำสถานะตั้งต้นตอนนั้นจะได้ค่าผิดแล้วสั่งโหลดซ้ำฟรี ๆ ในรอบถัดไป
+   */
+  _applyToPage(hidden) {
+    if (typeof MHNK_POI === 'undefined' || typeof MHNK_MAP === 'undefined') return;
+    var showing = this._hasPois();
+
+    if (hidden && showing) {
+      // ล้างแบบไม่ง้อเน็ต (เน็ตหลุดก็ยังซ่อนได้) — ใช้ทางเดียวกับที่ loadPois ใช้
+      MHNK_POI.pois = [];
+      MHNK_MAP.clearPois();
+      MHNK_POI._renderPoiList();
+      MHNK_POI._updateStats();
+      return;
+    }
+
+    // เปิดกลับ → ต้องไปเอาข้อมูลมาใหม่ เพราะตอนปิด server ไม่ได้ส่งอะไรมาเลย
+    if (!hidden && !showing && !this._restoring) {
+      this._restoring = true;
+      var self = this;
+      Promise.resolve(MHNK_POI.loadPois()).catch(function () {})
+        .then(function () { self._restoring = false; });
     }
   },
 
