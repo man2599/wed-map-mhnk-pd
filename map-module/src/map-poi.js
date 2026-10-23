@@ -20,9 +20,13 @@ const MHNK_POI = {
   _modalVisible: false,
   _selectedCoords: null,
   _searchQuery: '',
+  _filterCategory: 'all',
   _started: false,
   _suppressClicksUntil: 0,
   _submitting: false,
+  _openMenu: null,        // เมนู dropdown หมวดหมู่ที่เปิดอยู่
+  _openSelectBtn: null,   // ปุ่มที่เปิดเมนูนั้น
+  _ignoreScrollUntil: 0,  // กัน scroll ที่เกิดจากการเปิดเมนูเอง
 
   async init() {
     if (this._started) return; // ป้องกัน init ซ้ำ (จาก event + timeout fallback)
@@ -51,7 +55,22 @@ const MHNK_POI = {
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this._hideModal();
+      if (e.key !== 'Escape') return;
+
+      // dropdown หมวดหมู่เปิดอยู่ → Esc = เคลียร์คำค้นก่อน (ถ้ามี) แล้วค่อยปิด ไม่ปิด modal
+      if (this._openMenu) {
+        const search = this._openMenu.querySelector('.mhnk-cat-menu-search');
+        if (search && search.value) {
+          search.value = '';
+          this._filterCatMenu('');
+          search.focus({ preventScroll: true });
+          return;
+        }
+        this._closeCatMenu(true);
+        return;
+      }
+
+      this._hideModal();
     });
 
     const searchInput = document.getElementById('mhnk-poi-search');
@@ -62,12 +81,100 @@ const MHNK_POI = {
       });
     }
 
-    const filterSelect = document.getElementById('mhnk-poi-filter');
-    if (filterSelect) {
-      filterSelect.addEventListener('change', (e) => {
+    // ตัวกรองหมวดหมู่ = dropdown ที่มีรูปในตัวเลือก (เดิมเป็น <select> ซึ่งใส่รูปใน <option> ไม่ได้)
+    const filterBox = document.getElementById('mhnk-poi-filter');
+    if (filterBox) {
+      filterBox.addEventListener('change', (e) => {
+        if (!e.target || e.target.type !== 'hidden') return;
+        this._filterCategory = e.target.value || 'all';
         this._renderPoiList();
       });
     }
+
+    // เปิด/ปิด dropdown หมวดหมู่ (ใช้ร่วมกันทั้งฟอร์มเพิ่มจุดและตัวกรอง)
+    document.addEventListener('click', (e) => {
+      if (!e.target || typeof e.target.closest !== 'function') return;
+
+      const trigger = e.target.closest('.mhnk-cat-select');
+      if (trigger) {
+        e.preventDefault();
+        this._toggleCatMenu(trigger);
+        return;
+      }
+
+      const option = e.target.closest('.mhnk-cat-menu-item');
+      if (option) {
+        e.preventDefault();
+        this._pickCatOption(option);
+        return;
+      }
+
+      // คลิกที่อื่น → ปิด dropdown
+      if (this._openMenu && !e.target.closest('.mhnk-cat-menu')) this._closeCatMenu();
+    });
+
+    // คีย์บอร์ดใน dropdown: ↑ ↓ เลื่อน, Enter/Space เลือก, Tab ปิด
+    document.addEventListener('keydown', (e) => {
+      // ปุ่ม dropdown ที่โฟกัสอยู่ + กด ↑/↓ → เปิดเมนูแล้วเลื่อนไปตัวถัดไป/ก่อนหน้าเลย
+      if (!this._openMenu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        const el = document.activeElement;
+        if (el && el.classList && el.classList.contains('mhnk-cat-select')) {
+          e.preventDefault();
+          this._openCatMenu(el);
+          this._moveCatFocus(e.key === 'ArrowDown' ? 1 : -1);
+        }
+        return;
+      }
+
+      if (!this._openMenu) return;
+
+      const inSearch = !!(e.target && e.target.classList && e.target.classList.contains('mhnk-cat-menu-search'));
+
+      if (inSearch) {
+        // พิมพ์ค้นหาได้ตามปกติ (รวม Space) — ↑↓ กระโดดไปในลิสต์, Enter เลือกตัวที่กรองไว้
+        if (e.key === 'Tab') { this._closeCatMenu(true); return; }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          this._moveCatFocus(e.key === 'ArrowDown' ? 1 : -1);
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const hits = this._catMenuItems();
+          if (!hits.length) return;
+          const sel = hits.find(it => it.classList.contains('is-selected')) || hits[0];
+          this._pickCatOption(sel);
+        }
+        return;
+      }
+
+      if (e.key === 'Tab') { this._closeCatMenu(); return; }
+
+      const items = this._catMenuItems();
+      if (items.length === 0) return;
+      const cur = items.indexOf(document.activeElement);
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._moveCatFocus(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+
+      if ((e.key === 'Enter' || e.key === ' ') && cur !== -1) {
+        e.preventDefault();
+        this._pickCatOption(items[cur]);
+      }
+    });
+
+    // เลื่อนหน้า/ย่อขยายจอ → ปิด dropdown (ตำแหน่ง fixed จะเพี้ยน)
+    // แต่ scroll ที่เกิด "ในเมนูเอง" (ล้อเมาส์/ลากแถบเลื่อนดู 29 หมวด) ต้องไม่ปิดเมนู
+    window.addEventListener('resize', () => this._closeCatMenu());
+    document.addEventListener('scroll', (e) => {
+      if (Date.now() < this._ignoreScrollUntil) return;
+      const t = e.target;
+      if (t && t.nodeType === 1 && typeof t.closest === 'function' && t.closest('.mhnk-cat-menu')) return;
+      this._closeCatMenu();
+    }, true);
   },
 
   async loadPois() {
@@ -223,14 +330,269 @@ const MHNK_POI = {
     }
   },
 
-  /** Helper: icon สำหรับ sidebar dot */
-  _catDotHtml(cat) {
+  /**
+   * Helper: ไอคอนหมวดหมู่ = รูปจริงจาก blips/custom/ (ขนาดเท่าไอคอนเดิมในฟอร์ม)
+   * - ไม่มีไฟล์ไอคอน → จุดสีตามหมวด (ไม่ใช้ emoji แล้ว)
+   * - รูปโหลดไม่ขึ้น → ซ่อนรูปแล้วโชว์จุดสีแทน ไม่ให้เห็นไอคอนแตก
+   */
+  _catIconHtml(cat) {
+    const color = (cat && cat.color) || '#00e5ff';
     if (cat && cat.file) {
-      const file = encodeURI(cat.file);
-      return `<img src="/map-module/blips/custom/${file}" alt="" onerror="this.style.display='none';this.parentElement.textContent='📍'">`;
+      const file = escapeHtml(encodeURI(cat.file));
+      return `<span class="mhnk-cat-ico" style="--mc:${color}"><img src="/map-module/blips/custom/${file}" alt="" loading="lazy" onerror="var w=this.parentElement;this.remove();if(w)w.classList.add('is-empty')"></span>`;
     }
-    return '📍';
+    return `<span class="mhnk-cat-ico is-empty" style="--mc:${color}"></span>`;
   },
+
+  /**
+   * สร้าง dropdown หมวดหมู่ (custom select) — หน้าตาเหมือน <select> เดิม
+   * แต่ใส่ "รูปจริงจาก blips/custom/" ในแต่ละตัวเลือกได้
+   * @param {string} inputId id ของ <input type="hidden"> ที่เก็บค่าจริง (โค้ดเดิมอ่าน .value ได้เหมือนเดิม)
+   * @param {Array}  items   [{ value, label, iconHtml }]
+   * @param {string} selected ค่าที่เลือกอยู่
+   * @param {string} ariaLabel ชื่อสำหรับ screen reader
+   */
+  _catSelectHtml(inputId, items, selected, ariaLabel) {
+    const cur = items.find(it => it.value === selected) || items[0] || { value: '', label: '', iconHtml: '' };
+    // ลิสต์ยาว (เกิน 8 หมวด) → มีช่องค้นหาบนหัวเมนู (29 หมวดเลื่อนหาเองยาก)
+    const withSearch = items.length > 8;
+
+    const options = items.map(it => {
+      const on = it.value === cur.value;
+      return `
+        <div class="mhnk-cat-menu-item${on ? ' is-selected' : ''}" role="option" tabindex="-1"
+             aria-selected="${on ? 'true' : 'false'}" data-value="${escapeHtml(it.value)}">
+          ${it.iconHtml || '<span class="mhnk-cat-ico"></span>'}
+          <span class="mhnk-cat-menu-label">${escapeHtml(it.label)}</span>
+          <span class="mhnk-cat-menu-check" aria-hidden="true">✓</span>
+        </div>`;
+    }).join('');
+
+    const searchHtml = withSearch
+      ? `
+          <div class="mhnk-cat-menu-head">
+            <input type="text" class="mhnk-cat-menu-search" placeholder="ค้นหาหมวดหมู่..."
+                   autocomplete="off" spellcheck="false" aria-label="ค้นหาหมวดหมู่">
+          </div>`
+      : '';
+
+    return `
+      <div class="mhnk-cat-select-wrap">
+        <input type="hidden" id="${inputId}" value="${escapeHtml(cur.value)}">
+        <button type="button" class="mhnk-cat-select" data-cat-select="${inputId}"
+                aria-haspopup="listbox" aria-expanded="false" aria-label="${escapeHtml(ariaLabel || 'หมวดหมู่')}">
+          ${cur.iconHtml || '<span class="mhnk-cat-ico"></span>'}
+          <span class="mhnk-cat-select-label" title="${escapeHtml(cur.label)}">${escapeHtml(cur.label)}</span>
+          <span class="mhnk-cat-select-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="mhnk-cat-menu" hidden>${searchHtml}
+          <div class="mhnk-cat-menu-list" role="listbox" aria-label="${escapeHtml(ariaLabel || 'หมวดหมู่')}">${options}</div>
+          <div class="mhnk-cat-menu-empty" hidden>ไม่พบหมวดหมู่ที่ค้นหา</div>
+        </div>
+      </div>`;
+  },
+
+  /** กดปุ่มซ้ำ = ปิด, กดปุ่มอื่น = เปิดเมนูนั้น */
+  _toggleCatMenu(trigger) {
+    if (this._openMenu && this._openSelectBtn === trigger) {
+      this._closeCatMenu(true);
+      return;
+    }
+    this._openCatMenu(trigger);
+  },
+
+  /** เปิดเมนูให้ "เลื่อนลงมา" ใต้ปุ่ม (ถ้าที่ไม่พอจะพลิกขึ้นบน) */
+  _openCatMenu(trigger) {
+    const wrap = trigger.closest('.mhnk-cat-select-wrap');
+    const menu = wrap && wrap.querySelector('.mhnk-cat-menu');
+    if (!menu) return;
+    this._closeCatMenu();
+
+    // ล้างคำค้น/ตัวเลือกที่ถูกซ่อนจากการเปิดครั้งก่อน ให้เห็นครบทุกหมวด
+    this._resetCatMenuSearch(menu);
+
+    // ย้ายเมนูไปต่อท้าย <body> เพื่อไม่ให้ overflow ของ sidebar/modal ตัดขอบ
+    menu._mhnkHome = wrap;
+    document.body.appendChild(menu);
+    menu.hidden = false;
+    menu.style.visibility = 'hidden'; // ซ่อนไว้ก่อน ระหว่างวัดขนาด
+
+    const parts = this._catMenuParts(menu);
+
+    const r = trigger.getBoundingClientRect();
+    const menuH = menu.offsetHeight;
+    const menuW = Math.max(menu.offsetWidth, r.width);
+    const spaceBelow = window.innerHeight - r.bottom - 8;
+    const openUp = menuH > spaceBelow && r.top > spaceBelow;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - menuW - 8));
+
+    menu.style.minWidth = Math.round(r.width) + 'px';
+    menu.style.left = Math.round(left) + 'px';
+    menu.style.top = Math.round(openUp ? r.top - menuH - 6 : r.bottom + 6) + 'px';
+    menu.style.visibility = '';
+    menu.classList.add('is-open');
+
+    trigger.setAttribute('aria-expanded', 'true');
+    this._openMenu = menu;
+    this._openSelectBtn = trigger;
+    this._ignoreScrollUntil = Date.now() + 250;
+
+    // ผูกช่องค้นหา (ผูกครั้งเดียวต่อ node — เมนูถูกสร้างใหม่ทุกครั้งที่ re-render)
+    if (parts.search && !parts.search._mhnkBound) {
+      parts.search._mhnkBound = true;
+      parts.search.addEventListener('input', () => this._filterCatMenu(parts.search.value));
+    }
+
+    // เลื่อนไปที่ตัวเลือกปัจจุบัน (แตะ scrollTop ของลิสต์เอง ไม่ใช้ scrollIntoView กันหน้าเว็บกระโดด)
+    const list = parts.list;
+    const sel = menu.querySelector('.mhnk-cat-menu-item.is-selected');
+    if (list && sel) {
+      const lr = list.getBoundingClientRect();
+      const sr = sel.getBoundingClientRect();
+      list.scrollTop = Math.max(0, list.scrollTop + (sr.top + sr.height / 2) - (lr.top + lr.height / 2));
+    }
+
+    // มีช่องค้นหา → โฟกัสให้พิมพ์ค้นหาได้ทันที (↑/↓ ใช้ต่อได้เลย)
+    if (parts.search) parts.search.focus({ preventScroll: true });
+  },
+
+  /** ปิดเมนู + คืนเมนูกลับเข้า wrapper เดิม (เพื่อให้ re-render ล้างทิ้งได้ปกติ) */
+  _closeCatMenu(restoreFocus) {
+    const menu = this._openMenu;
+    const btn = this._openSelectBtn;
+    this._openMenu = null;
+    this._openSelectBtn = null;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (menu) {
+      menu.classList.remove('is-open');
+      this._resetCatMenuSearch(menu);
+      menu.hidden = true;
+      menu.removeAttribute('style');
+      if (menu._mhnkHome && menu._mhnkHome.isConnected) menu._mhnkHome.appendChild(menu);
+      menu._mhnkHome = null;
+    }
+    if (restoreFocus && btn && btn.isConnected) btn.focus();
+  },
+
+  /** ดึงส่วนประกอบของเมนู (ลิสต์ที่เลื่อนได้ / ช่องค้นหา / ข้อความ "ไม่พบ") */
+  _catMenuParts(menu) {
+    return {
+      list: menu.querySelector('.mhnk-cat-menu-list'),
+      search: menu.querySelector('.mhnk-cat-menu-search'),
+      empty: menu.querySelector('.mhnk-cat-menu-empty')
+    };
+  },
+
+  /** เฉพาะตัวเลือกที่มองเห็นอยู่ (หลังกรองด้วยคำค้น) */
+  _catMenuItems() {
+    if (!this._openMenu) return [];
+    return Array.prototype.slice.call(this._openMenu.querySelectorAll('.mhnk-cat-menu-item:not([hidden])'));
+  },
+
+  /**
+   * เลื่อนโฟกัสไปตัวเลือกถัดไป/ก่อนหน้า (+1/-1)
+   * - ถ้าโฟกัสยังไม่ใช่ตัวเลือก (อยู่ที่ปุ่มหรือช่องค้นหา) → เริ่มจากตัวที่เลือกอยู่ ±1
+   *   (กด ↑/↓ ครั้งแรกจึงขยับทันที ไม่รู้สึกว่า "ลูกศรไม่ทำงาน")
+   * - ใช้ preventScroll + เลื่อน scrollTop ของลิสต์เอง → หน้าเว็บไม่เลื่อน เมนูจึงไม่ถูกปิด
+   */
+  _moveCatFocus(dir) {
+    const items = this._catMenuItems();
+    if (items.length === 0) return;
+
+    const cur = items.indexOf(document.activeElement);
+    let next;
+    if (cur === -1) {
+      const selIdx = items.findIndex(el => el.classList.contains('is-selected'));
+      next = selIdx === -1 ? (dir > 0 ? 0 : items.length - 1) : selIdx + dir;
+    } else {
+      next = cur + dir;
+    }
+    if (next < 0) next = 0;
+    if (next > items.length - 1) next = items.length - 1;
+
+    this._focusCatItem(items[next]);
+  },
+
+  /** โฟกัสตัวเลือก + เลื่อนเฉพาะลิสต์ให้เห็นตัวนั้น (ไม่แตะ scroll ของหน้าเว็บ) */
+  _focusCatItem(item) {
+    if (!item) return;
+    item.focus({ preventScroll: true });
+
+    const list = this._openMenu && this._openMenu.querySelector('.mhnk-cat-menu-list');
+    if (!list) return;
+    const lr = list.getBoundingClientRect();
+    const ir = item.getBoundingClientRect();
+    if (ir.top < lr.top) list.scrollTop -= (lr.top - ir.top) + 6;
+    else if (ir.bottom > lr.bottom) list.scrollTop += (ir.bottom - lr.bottom) + 6;
+  },
+
+  /** ล้างคำค้น + แสดงตัวเลือกทั้งหมด (เรียกตอนเปิด/ปิดเมนู) */
+  _resetCatMenuSearch(menu) {
+    if (!menu) return;
+    const parts = this._catMenuParts(menu);
+    if (parts.search) parts.search.value = '';
+    if (parts.empty) parts.empty.hidden = true;
+    Array.prototype.forEach.call(menu.querySelectorAll('.mhnk-cat-menu-item'), el => { el.hidden = false; });
+    if (parts.list) parts.list.scrollTop = 0;
+  },
+
+  /** กรองตัวเลือกตามคำค้น (ตรงกับชื่อหมวดหรือ id ก็ได้) */
+  _filterCatMenu(query) {
+    const menu = this._openMenu;
+    if (!menu) return;
+    const parts = this._catMenuParts(menu);
+    const q = String(query || '').trim().toLowerCase();
+
+    let shown = 0;
+    Array.prototype.forEach.call(menu.querySelectorAll('.mhnk-cat-menu-item'), el => {
+      const labelEl = el.querySelector('.mhnk-cat-menu-label');
+      const label = (labelEl ? labelEl.textContent : '').toLowerCase();
+      const val = (el.getAttribute('data-value') || '').toLowerCase();
+      const hit = !q || label.indexOf(q) !== -1 || val.indexOf(q) !== -1;
+      el.hidden = !hit;
+      if (hit) shown++;
+    });
+
+    if (parts.empty) parts.empty.hidden = shown !== 0;
+    if (parts.list) parts.list.scrollTop = 0;
+  },
+
+  /** เลือกตัวเลือก → อัปเดตปุ่ม + hidden input แล้วยิง change ให้โค้ดเดิมทำงานต่อ */
+  _pickCatOption(item) {
+    const menu = item.closest('.mhnk-cat-menu');
+    const btn = this._openSelectBtn;
+    if (!menu || !btn) return;
+
+    const value = item.getAttribute('data-value') || '';
+
+    menu.querySelectorAll('.mhnk-cat-menu-item').forEach(el => {
+      const on = el === item;
+      el.classList.toggle('is-selected', on);
+      el.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+
+    // อัปเดตไอคอน + ข้อความบนปุ่ม
+    const curIco = btn.querySelector('.mhnk-cat-ico');
+    const newIco = item.querySelector('.mhnk-cat-ico');
+    if (curIco && newIco) curIco.replaceWith(newIco.cloneNode(true));
+
+    const curLabel = btn.querySelector('.mhnk-cat-select-label');
+    const newLabel = item.querySelector('.mhnk-cat-menu-label');
+    if (curLabel && newLabel) {
+      curLabel.textContent = newLabel.textContent;
+      curLabel.setAttribute('title', newLabel.textContent);
+    }
+
+    const inputId = btn.getAttribute('data-cat-select');
+    const input = inputId ? document.getElementById(inputId) : null;
+    if (input) {
+      input.value = value;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    this._closeCatMenu(true);
+  },
+
   _showAddForm(x, y) {
     const overlay = document.getElementById('mhnk-modal-overlay');
     const body = document.getElementById('mhnk-modal-body');
@@ -239,11 +601,18 @@ const MHNK_POI = {
     this._modalVisible = true;
     overlay.classList.add('show');
 
-    // Dropdown options - browser ไม่ support <img> ใน <option> ใช้ข้อความอย่างเดียว
+    // หมวดหมู่ — dropdown ที่มีรูปจริงจาก blips/custom ในแต่ละตัวเลือก
+    // (browser ใส่ <img> ใน <option> ของ <select> ไม่ได้ จึงสร้าง dropdown เอง)
     const catEntries = Object.values(MAP_CATEGORIES);
-    const catOptions = catEntries.length > 0
-      ? catEntries.map(cat => `<option value="${escapeHtml(cat.id)}">📌 ${escapeHtml(cat.label)}</option>`).join('')
-      : '<option value="custom">📌 อื่นๆ</option>';
+    const catItems = (catEntries.length > 0
+      ? catEntries
+      : [{ id: 'custom', label: 'อื่นๆ', color: '#888888', file: '' }]
+    ).map(cat => ({
+      value: cat.id,
+      label: cat.label || cat.id,
+      iconHtml: this._catIconHtml(cat)
+    }));
+    const catSelect = this._catSelectHtml('mhnk-poi-category', catItems, catItems[0].value, 'หมวดหมู่');
 
     body.innerHTML = `
       <div class="mhnk-modal">
@@ -268,8 +637,8 @@ const MHNK_POI = {
             <input type="text" id="mhnk-poi-name" placeholder="เช่น ด่านตรวจถนนจ้าว...">
           </div>
           <div class="mhnk-form-group">
-            <label for="mhnk-poi-category">หมวดหมู่ <span class="required">*</span></label>
-            <select id="mhnk-poi-category">${catOptions}</select>
+            <div class="mhnk-form-group-label" id="mhnk-poi-category-label">หมวดหมู่ <span class="required">*</span></div>
+            ${catSelect}
           </div>
           <div class="mhnk-form-group">
             <label for="mhnk-poi-desc">รายละเอียด</label>
@@ -342,6 +711,8 @@ const MHNK_POI = {
   },
 
   _hideModal() {
+    // ปิด dropdown ที่ค้างอยู่ก่อน (เมนูถูกย้ายไป <body> ต้องเก็บกลับ)
+    this._closeCatMenu();
     const overlay = document.getElementById('mhnk-modal-overlay');
     if (overlay) overlay.classList.remove('show');
     this._modalVisible = false;
@@ -354,7 +725,7 @@ const MHNK_POI = {
     const container = document.getElementById('mhnk-poi-list');
     if (!container) return;
 
-    const filterCategory = document.getElementById('mhnk-poi-filter')?.value || 'all';
+    const filterCategory = this._filterCategory || 'all';
     const query = this._searchQuery?.toLowerCase() || '';
 
     let filtered = this.pois;
@@ -387,7 +758,7 @@ const MHNK_POI = {
 
       return `
         <div class="mhnk-poi-item" data-poi-id="${escapeHtml(poi.id)}" style="--mc:${mc}" onclick="MHNK_POI._goToPoi('${escapeHtml(poi.id)}')">
-          <div class="mhnk-poi-item-dot" style="--mc:${mc}">${this._catDotHtml(cat)}</div>
+          <div class="mhnk-poi-item-dot" style="--mc:${mc}">${this._catIconHtml(cat)}</div>
           <div class="mhnk-poi-item-name" title="${name}">${name}</div>
           <span class="mhnk-poi-item-coord">X:${x} Y:${y}</span>
           ${editBtn}
@@ -443,12 +814,23 @@ const MHNK_POI = {
     const filter = document.getElementById('mhnk-poi-filter');
     if (!filter) return;
 
-    const catEntries = Object.values(MAP_CATEGORIES);
-    filter.innerHTML = '<option value="all">🏷️ ทั้งหมด</option>' +
-      (catEntries.length > 0
-        ? catEntries.map(cat => `<option value="${escapeHtml(cat.id)}">📌 ${escapeHtml(cat.label)}</option>`).join('')
-        : '<option value="custom">📌 อื่นๆ</option>'
-      );
+    // ถ้าหมวดที่กรองอยู่ถูกลบ/เปลี่ยนชื่อ → กลับไป "ทั้งหมด"
+    if (this._filterCategory !== 'all' && !MAP_CATEGORIES[this._filterCategory]) {
+      this._filterCategory = 'all';
+    }
+
+    // ปิดเมนูที่ค้างอยู่ก่อนวาดใหม่ (กัน node กำพร้า)
+    this._closeCatMenu();
+
+    const items = [{ value: 'all', label: 'ทั้งหมด', iconHtml: '' }].concat(
+      Object.values(MAP_CATEGORIES).map(cat => ({
+        value: cat.id,
+        label: cat.label || cat.id,
+        iconHtml: this._catIconHtml(cat)
+      }))
+    );
+
+    filter.innerHTML = this._catSelectHtml('mhnk-poi-filter-value', items, this._filterCategory, 'กรองตามหมวดหมู่');
   },
 
 };

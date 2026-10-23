@@ -2892,3 +2892,250 @@ body {
 .mhnk-boot-logo { width: 200px; height: 200px; object-fit: contain; }
 .hud-logo-img { width: 50px; height: 50px; object-fit: contain; vertical-align: middle; }
 .sidebar-logo-img { width: 50px; height: 50px; object-fit: contain; vertical-align: middle; }
+/* ═══════════════ CATEGORY DROPDOWN (custom select + รูปจาก blips/custom) ═══════════════ */
+
+/* เดิมหมวดหมู่ใช้ <select> + ไอคอนอีโมจิ แต่ browser ใส่ <img> ลงใน <option> ไม่ได้
+   จึงสร้าง dropdown เอง (ปุ่ม + เมนู listbox) หน้าตาเหมือน <select> เดิม
+   แต่ละตัวเลือกแสดงรูปไฟล์จริงจาก blips/custom/ */
+
+.mhnk-cat-select-wrap { position: relative; }
+
+/* ── ปุ่มที่กดแล้วมีเมนูเลื่อนลงมา (หน้าตาเหมือน <select> เดิม) ── */
+.mhnk-cat-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 34px 10px 14px;
+  background: rgba(3, 7, 15, 0.7);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.mhnk-cat-select:hover {
+  border-color: rgba(0, 229, 255, 0.5);
+  background: rgba(11, 20, 40, 0.9);
+}
+
+.mhnk-cat-select:focus,
+.mhnk-cat-select[aria-expanded="true"] {
+  border-color: rgba(0, 229, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
+}
+
+.mhnk-cat-select-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+/* ลูกศร ▾ ของปุ่ม (แทนลูกศรเดิมของ <select>) */
+.mhnk-cat-select-caret {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--cyan);
+  font-size: 11px;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+  transition: transform 0.2s ease;
+}
+
+.mhnk-cat-select[aria-expanded="true"] .mhnk-cat-select-caret {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* ── เมนูที่เลื่อนลงมา (ตอนเปิดจะถูกย้ายไปต่อท้าย <body> + position: fixed) ── */
+.mhnk-cat-menu {
+  position: fixed;
+  z-index: 13000;
+  display: flex;
+  flex-direction: column;
+  max-height: min(320px, 60vh);
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: contain; /* เลื่อนสุดขอบเมนูแล้วไม่ทะลุไปเลื่อนหน้าเว็บ (ซึ่งจะทำให้เมนูปิด) */
+  box-sizing: border-box;
+  background: rgba(6, 11, 22, 0.98);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 229, 255, 0.12);
+  animation: catMenuIn 0.14s ease-out;
+}
+
+.mhnk-cat-menu[hidden] { display: none; }
+
+/* ── ช่องค้นหาหมวดหมู่ (29 หมวด — พิมพ์กรองเร็วกว่าไล่เลื่อน) ── */
+.mhnk-cat-menu-head {
+  flex: 0 0 auto;
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.14);
+  background: rgba(3, 7, 15, 0.6);
+  border-radius: 10px 10px 0 0;
+}
+
+.mhnk-cat-menu-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  background: rgba(3, 7, 15, 0.85);
+  border: 1px solid rgba(0, 229, 255, 0.22);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mhnk-cat-menu-search::placeholder { color: rgba(160, 190, 210, 0.55); }
+
+.mhnk-cat-menu-search:focus {
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+}
+
+/* ── พื้นที่ลิสต์: เลื่อนขึ้น-ลงได้ + scrollbar สี cyan ให้เห็นว่ามีอีกหลายหน้า ── */
+.mhnk-cat-menu-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 255, 0.45) rgba(0, 229, 255, 0.06);
+}
+
+.mhnk-cat-menu-list::-webkit-scrollbar { width: 8px; }
+.mhnk-cat-menu-list::-webkit-scrollbar-track { background: rgba(0, 229, 255, 0.06); border-radius: 8px; }
+.mhnk-cat-menu-list::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.42); border-radius: 8px; }
+.mhnk-cat-menu-list::-webkit-scrollbar-thumb:hover { background: rgba(0, 229, 255, 0.7); }
+
+/* ตัวเลือกที่ถูกกรองออก (hidden) — ต้องมี เพราะ .mhnk-cat-menu-item ตั้ง display: flex ไว้ */
+.mhnk-cat-menu-item[hidden] { display: none; }
+
+/* ไม่พบหมวดหมู่ที่ค้นหา */
+.mhnk-cat-menu-empty {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  color: rgba(160, 190, 210, 0.7);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: center;
+}
+
+.mhnk-cat-menu-empty[hidden] { display: none; }
+
+@keyframes catMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mhnk-cat-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.3;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mhnk-cat-menu-item:hover,
+.mhnk-cat-menu-item:focus {
+  background: rgba(0, 229, 255, 0.14);
+  color: #fff;
+}
+
+.mhnk-cat-menu-item.is-selected {
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--cyan);
+}
+
+.mhnk-cat-menu-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.mhnk-cat-menu-check {
+  flex: 0 0 auto;
+  opacity: 0;
+  color: var(--cyan);
+  font-size: 11px;
+}
+
+.mhnk-cat-menu-item.is-selected .mhnk-cat-menu-check { opacity: 1; }
+
+/* label ของ div (ไม่ใช่ <label for>) — เลียนสไตล์ .mhnk-form-group label */
+.mhnk-form-group-label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text);
+  margin-bottom: 6px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+}
+
+.mhnk-form-group-label .required { color: var(--red); }
+
+/* รูปไอคอนขนาดเท่าไอคอนเดิมในฟอร์ม (ฟอนต์ 13px → 16px) */
+.mhnk-cat-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  vertical-align: middle;
+}
+
+.mhnk-cat-ico img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* ไม่มีไฟล์ไอคอน / รูปโหลดไม่ขึ้น → จุดสีตามหมวด (ไม่เห็นไอคอนแตก) */
+.mhnk-cat-ico.is-empty::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mc, #00e5ff);
+  box-shadow: 0 0 6px var(--mc, #00e5ff);
+}
+
+/* ไอคอนในลิสต์จุด: 20px ในวงกลม 30px (contain ไม่ให้หมุดถูกตัดขอบ) */
+.mhnk-poi-item-dot .mhnk-cat-ico { width: 20px; height: 20px; flex: 0 0 20px; }
+.mhnk-poi-item-dot .mhnk-cat-ico img { width: 20px; height: 20px; object-fit: contain; border-radius: 0; }
+
+/* ตัวกรองไม่ใช่ <select> แล้ว → ไม่ต้องมีลูกศร ▾ */
+.mhnk-filter-wrap::after { content: none; }
+
